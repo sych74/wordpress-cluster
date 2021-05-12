@@ -44,6 +44,7 @@ resp.nodes.push({
   fixedCloudlets: ${settings.db_fixedCloudlets:1},
   count: db_count,
   nodeGroup: "sqldb",
+  tag: "10.3.27",
   restartDelay: 10,
   skipNodeEmails: true,
   validation: {
