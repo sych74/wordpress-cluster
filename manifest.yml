@@ -12,7 +12,7 @@ logo: /images/wp-cluster-kit.svg
 baseUrl: https://raw.githubusercontent.com/jelastic-jps/wordpress-cluster/v2.0.0
 
 onBeforeInit: /scripts/settings.js?_r=${fn.random}
-onBeforeInstall: /scripts/beforeinstall.js?_r=${fn.random}
+onBeforeInstall: https://raw.githubusercontent.com/jelastic-jps/wordpress-cluster/mariadb103/scripts/beforeinstall.js?_r=${fn.random}
 
 skipNodeEmails: true
 nodes: definedInOnBeforeInstall
