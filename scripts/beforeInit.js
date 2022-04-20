@@ -20,6 +20,22 @@ var nodesPerEnvWO_Bl = 9,
       maxCloudlets = 16,
       markup = "", cur = null, text = "used", prod = true;
 
+var hasCollaboration = (parseInt('${fn.compareEngine(7.0)}', 10) >= 0),
+    quotas = [], group;
+
+if (hasCollaboration) {
+    quotas = [
+        { quota : { name: perEnv }, value: parseInt('${quota.environment.maxnodescount}', 10) },
+        { quota : { name: maxEnvs }, value: parseInt('${quota.environment.maxcount}', 10) },
+        { quota : { name: perNodeGroup }, value: parseInt('${quota.environment.maxsamenodescount}', 10) },
+        { quota : { name: maxCloudletsPerRec }, value: parseInt('${quota.environment.maxcloudletsperrec}', 10) }
+    ];
+    group = { groupType: '${account.groupType}' };
+} else {
+    quotas = jelastic.billing.account.GetQuotas(perEnv + ";"+maxEnvs+";" + perNodeGroup + ";" + maxCloudletsPerRec).array;
+    group = jelastic.billing.account.GetAccount(appid, session);
+}
+
 var settings = jps.settings;
 var fields = {};
 for (var i = 0, field; field = jps.settings.fields[i]; i++)
@@ -147,6 +163,14 @@ if (!prod || group.groupType == 'trial') {
   settings.fields.push(
     {"type": "compositefield","height": 0,"hideLabel": true,"width": 0,"items": [{"height": 0,"type": "string","required": true}]}
   );
+}
+
+if (hasCollaboration) {
+    settings.fields.push({
+        "type": "owner",
+        "name": "ownerUid",
+        "caption": "Owner"
+    });
 }
 
 return {
