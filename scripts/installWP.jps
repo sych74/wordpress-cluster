@@ -64,6 +64,7 @@ actions:
   setupWordPress:
     - cmd[${nodes.cp.master.id}]: |-
         grep -qE "(WP_AUTO_UPDATE_CORE)" ${SERVER_WEBROOT}/wp-config.php || sed -i "/^\$table_prefix.*/a define( 'WP_AUTO_UPDATE_CORE', false );" ${SERVER_WEBROOT}/wp-config.php;
+        grep -qE "(AUTOMATIC_UPDATER_DISABLED)" ${SERVER_WEBROOT}/wp-config.php || sed -i "/^\$table_prefix.*/a define( 'AUTOMATIC_UPDATER_DISABLED', true );" ${SERVER_WEBROOT}/wp-config.php;
         cd ~/bin/ && wp option update permalink_structure '/%postname%/' --path=${SERVER_WEBROOT};
         cd ~/bin/ && wp rewrite structure '/%postname%/' --hard --path=${SERVER_WEBROOT};
         
