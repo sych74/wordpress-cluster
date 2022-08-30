@@ -20,6 +20,13 @@ nodes: definedInOnBeforeInstall
 
 settings:
   fields:
+    - type: dockertags
+      caption: Database version
+      nodeType: mariadb-dockerized
+      name: db_tag
+      width: 225
+      hidden: false    
+
     - caption: Scaling Strategy
       type: list
       name: loadGrowth
