@@ -39,7 +39,7 @@ if ('${settings.glusterfs:false}' == 'true') {
 
 resp.nodes.push({
   nodeType: "mariadb-dockerized",
-  tag: ${settings.db_tag},
+  tag: "${settings.db_tag}",
   flexibleCloudlets: ${settings.db_flexibleCloudlets:16},
   fixedCloudlets: ${settings.db_fixedCloudlets:1},
   count: db_count,
