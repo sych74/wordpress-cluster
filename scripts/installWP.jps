@@ -9,8 +9,9 @@ mixins:
 globals:
   WP_ADMIN_PASS: ${settings.wp_admin_pass}
   WP_TITLE: ${settings.wp_title}
-  DB_HOST: ${settings.db_host}
-  DB_NAME: wp_${fn.random}
+  DB_HOST: ${settings.db_host:127.0.0.1}
+  DB_PORT: ${settings.db_port:3306}
+  DB_NAME: ${settings.db_name:wp-[fn.random]}
   DB_USER: ${settings.db_user}
   DB_PASS: ${settings.db_pass}
   REDIS_HOST: ${settings.redis_host:}
@@ -47,8 +48,7 @@ actions:
           wget ${baseUrl}../images/favicon.ico -O /var/www/webroot/ROOT/favicon.ico;
     - else:
         cmd[${nodes.cp.master.id}]: |-
-          mysql -u${globals.DB_USER} -p${globals.DB_PASS} -h ${globals.DB_HOST} -e "CREATE DATABASE IF NOT EXISTS ${globals.DB_NAME};"
-          cd /var/www/webroot/ROOT && wp core config --dbhost=${globals.DB_HOST} --dbname=${globals.DB_NAME} --dbuser=${globals.DB_USER} --dbpass=${globals.DB_PASS} --path=/var/www/webroot/ROOT;
+          cd /var/www/webroot/ROOT && wp core config --dbhost=${globals.DB_HOST}:${globals.DB_PORT} --dbname=${globals.DB_NAME} --dbuser=${globals.DB_USER} --dbpass=${globals.DB_PASS} --path=/var/www/webroot/ROOT;
           cd /var/www/webroot/ROOT && wp core install --title="${globals.WP_TITLE}" --admin_user=${user.email} --admin_password=${globals.WP_ADMIN_PASS} --url=${globals.WP_URL} --admin_email=${user.email} --skip-email --path=/var/www/webroot/ROOT;
           wget ${baseUrl}../images/favicon.ico -O /var/www/webroot/ROOT/favicon.ico;
 
