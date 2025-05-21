@@ -2,7 +2,7 @@ import com.hivext.api.Response;
 import org.yaml.snakeyaml.Yaml;
 import com.hivext.api.core.utils.Transport;
 
-var cdnAppid = "c05ffa5b45628a2a0c95467ebca8a0b4";
+var cdnAppid = "c05ffa5b45628a2a0c95467ebca8a0b4test";
 var lsAppid = "9e6afcf310004ac84060f90ff41atest";
 var baseUrl = "https://raw.githubusercontent.com/jelastic-jps/wordpress-cluster/master";
 var cdnText = "Install Lightning-Fast Premium CDN",
