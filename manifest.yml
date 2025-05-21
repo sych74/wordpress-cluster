@@ -11,7 +11,7 @@ description:
   short: WordPress Cluster with built-in kit v2 for choosing optimal servers, database clustering type, scaling mode and a set of advanced features for highly-loaded projects
 logo: /images/wp-cluster-kit.svg
 
-baseUrl: https://cdn.jsdelivr.net/gh/jelastic-jps/wordpress-cluster@latest
+baseUrl: https://cdn.jsdelivr.net/gh/jelastic-jps/wordpress-cluster
 
 onBeforeInit: /scripts/beforeInit.js?_r=${fn.random}
 onBeforeInstall: /scripts/beforeInstall.js?_r=${fn.random}
@@ -135,7 +135,7 @@ settings:
       markup: ""
 
 mixins:
- - https://cdn.jsdelivr.net/gh/jelastic-jps/wordpress-cluster@latest/configs/vers.yaml
+ - https://cdn.jsdelivr.net/gh/jelastic-jps/wordpress-cluster/configs/vers.yaml
  - /scripts/common.yml
 
 globals:
@@ -168,7 +168,7 @@ onInstall:
         var actions = [];
         if ('${settings.le-addon:false}' == 'true')
           actions.push({
-            jps: "https://cdn.jsdelivr.net/gh/jelastic-jps/lets-encrypt@latest/manifest.jps",
+            jps: "https://cdn.jsdelivr.net/gh/jelastic-jps/lets-encrypt/manifest.jps",
             nodeGroup: "bl",
             skipEmail: "true",
             settings: {
@@ -179,7 +179,7 @@ onInstall:
           });
         if ('${settings.cdn-addon:false}' == 'true')
           actions.push({
-            jps: "https://cdn.jsdelivr.net/gh/jelastic-jps/cdn@latest/manifest.yml",
+            jps: "https://cdn.jsdelivr.net/gh/jelastic-jps/cdn/manifest.yml",
             nodeGroup: "bl",
             skipEmail: "true",
             settings: {
@@ -264,12 +264,12 @@ actions:
   optimization:
     - log: Load Balancers and App servers optimization
     - install:
-      - jps: https://cdn.jsdelivr.net/gh/jelastic/templates@latest/config_v2.jps
+      - jps: https://cdn.jsdelivr.net/gh/jelastic/templates/config_v2.jps
         settings:
           targetGroup: bl
           targetNodes: bl
           optimization: wordpress
-      - jps: https://cdn.jsdelivr.net/gh/jelastic/templates@latest/config_v2.jps
+      - jps: https://cdn.jsdelivr.net/gh/jelastic/templates/config_v2.jps
         settings:
           targetGroup: cp
           targetNodes: cp
