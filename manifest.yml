@@ -1,16 +1,17 @@
 type: install
 jpsVersion: '1.7.2'
-name: WordPress Cluster Kit v2
-id: wordpress-cluster
+name: WordPress Cluster Kit v2 JE-61515
+id: wordpress-cluster-je-61515
 categories:
   - apps/clusters
   - apps/content-management
+  - apps/wordpress
 description:
   text: WordPress Cluster Kit with highly available Load Balancer and Shared Storage with GlusterFS, database clustering, and scaling mode to create an optimal environment for highly-loaded projects. The package provides integrated autoscaling and high availability for development and production environments. Clustered topology ensures effective handling of heavy workload.
   short: WordPress Cluster with built-in kit v2 for choosing optimal servers, database clustering type, scaling mode and a set of advanced features for highly-loaded projects
 logo: /images/wp-cluster-kit.svg
 
-baseUrl: https://raw.githubusercontent.com/jelastic-jps/wordpress-cluster/v2.2.0
+baseUrl: https://raw.githubusercontent.com/sych74/wordpress-cluster/v2.2.0
 
 onBeforeInit: /scripts/beforeInit.js?_r=${fn.random}
 onBeforeInstall: /scripts/beforeInstall.js?_r=${fn.random}
@@ -19,6 +20,7 @@ skipNodeEmails: true
 nodes: definedInOnBeforeInstall
 
 settings:
+  onBeforeInit: return settings;
   fields:
     - caption: Scaling Strategy
       type: list
@@ -28,7 +30,7 @@ settings:
       width: 225
       tooltip: |
         Configure auto-scaling triggers, i.e. how fast the system responds to load spikes by adding or removing nodes.
-        <p>Read more about <a href="https://docs.jelastic.com/automatic-horizontal-scaling">Automatic Horizontal Scaling</a></p>
+        <p>Read more about <a href="https://docs.jelastic.com/automatic-horizontal-scaling" target='_blank'>Automatic Horizontal Scaling</a></p>
       values:
         - value: slow
           caption: Low Load
@@ -43,14 +45,14 @@ settings:
     - caption: Advanced Features
       type: displayfield
       name: displayfield
-      markup:
+      markup: ""
 
-    - caption: Install LiteSpeed High-Performance Web Server
+    - caption: Install LiteSpeed High-Performance Web Server (Additional License Fee)
       type: checkbox
       name: ls-addon
       value: true
       disabled: false
-      tooltip: "If this option is disabled, the cluster will be installed using NGINX load balancer and application servers"
+      tooltip: "If this option is disabled, the cluster will be installed using NGINX load balancer and application servers. More info about LiteSpeed <a href='https://docs.jelastic.com/litespeed-web-server/' target='_blank'>here</a>"
       showIf:
         true:
           - caption: WordPress Brute Force Attack Protection
@@ -87,7 +89,7 @@ settings:
       name: galera
       value: true
       disabled: false
-      tooltip: "<h3>Requirements for All Tables:</h3> * run on InnoDB storage engine <p>* have a primary key</p>Read more about <a href='https://mariadb.com/kb/en/library/mariadb-galera-cluster-known-limitations/'>limitations</a>"
+      tooltip: "<h3>Requirements for All Tables:</h3> * run on InnoDB storage engine <p>* have a primary key</p>Read more about <a href='https://mariadb.com/kb/en/library/mariadb-galera-cluster-known-limitations/' target='_blank'>limitations</a>"
 
     - caption: Install Let's Encrypt SSL with Auto-Renewal
       type: checkbox
@@ -99,7 +101,8 @@ settings:
     - caption: Install Lightning-Fast Premium CDN
       type: checkbox
       name: cdn-addon
-      value: true
+      value: false
+      hidden: true
       disabled: false
       tooltip: "Jelastic CDN is an HTTP/3 premium content delivery network of 160+ Super PoPs (points of presence) with bandwidth capacity up to 115 Tbps, advanced caching and acceleration strategies based on best-in-class IP Anycast technology."
 
@@ -124,15 +127,16 @@ settings:
       disabled: false
       tooltip: "WooCommerce is a free open-source e-commerce plugin designed specifically for WordPress. This is a great platform for a store of any size."
 
-    - type: displayfield
+    - type: spinner
       hideLabel: true
       hidden: true
       name: bl_count
       value: 2
-      markup:
+      markup: ""
 
 mixins:
  - https://raw.githubusercontent.com/jelastic-jps/wordpress-cluster/master/configs/vers.yaml
+ - /scripts/common.yml
 
 globals:
   PATH: ${baseUrl}
@@ -145,12 +149,11 @@ globals:
   SUCCESS: default
 
 onInstall:
-
-  - limits
+  - addLimits
+  - addMetadata
   - setProtocol
   - setDomain
   - initLEsettings
-  - if (${settings.is_trigger:true}): setTriggers
   - optimization
   - setupCacheSync
   - storageHealthCheck
@@ -176,7 +179,7 @@ onInstall:
           });
         if ('${settings.cdn-addon:false}' == 'true')
           actions.push({
-            jps: "https://raw.githubusercontent.com/edgeport/cdn/master/manifest.yml?_r=${fn.random}",
+            jps: "https://raw.githubusercontent.com/jelastic-jps/cdn/master/manifest.yml?_r=${fn.random}",
             nodeGroup: "bl",
             skipEmail: "true",
             settings: {
@@ -191,6 +194,7 @@ onInstall:
     - jps: /scripts/cacheClean.jps?_r=${fn.random}
     - jps: /scripts/addons.jps?_r=${fn.random}
     - jps: /scripts/events.jps?_r=${fn.random}
+  - if (${settings.is_trigger:true}): setTriggers
   - if ('${settings.success_email}' != 'false'):
       - return:
           type: success
@@ -199,12 +203,17 @@ onInstall:
 
 actions:
 
-  limits:
-    - env.control.ApplyNodeGroupData[bl,cp,sqldb,storage,nosqldb]:
+  addLimits:
+    - env.control.ApplyNodeGroupData [*]:
         data:
-          project: ${settings.project:default}
-          projectScope: ${settings.projectScope:production}
           isRequired: true
+
+  addMetadata:
+    script: |
+      var metadata = { project: "${settings.project:default}", projectScope: "${settings.projectScope:production}" };
+      return api.env.control.ApplyEnvProperty ?
+        api.env.control.ApplyEnvProperty('${env.name}', session, metadata) :
+        api.env.control.ApplyNodeGroupData('${env.name}', session, 'cp', metadata);
 
   setProtocol:
     - script: |
@@ -330,5 +339,5 @@ actions:
           
   installWoocommerce:
     cmd[${nodes.cp.master.id}]: |-
-      wp plugin install woocommerce --version=${globals.version_woocommerce} --activate --path=${SERVER_WEBROOT} &>> /var/log/run.log;
+      wp plugin install woocommerce --version=${globals.version_woocommerce} --activate --path=/var/www/webroot/ROOT &>> /var/log/run.log;
   

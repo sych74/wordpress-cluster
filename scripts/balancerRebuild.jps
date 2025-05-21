@@ -1,0 +1,7 @@
+jpsType: update
+name: Balancer Rebuild 
+description: This script for balancer rebuild 
+id: wordpress-balancer-rebuild
+  
+onInstall:
+  - log: JPS for balancer rebuild is depricated and no longer used.

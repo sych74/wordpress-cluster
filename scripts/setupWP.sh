@@ -4,8 +4,10 @@ purge=false;
 pgcache=false;
 objectcache=false;
 edgeportCDN=false;
-wpmu=false;
-DOMAIN=false;
+multisite=false;
+domain=false;
+url=false;
+woocommerce=false;
 
 SERVER_WEBROOT=/var/www/webroot/ROOT
 
@@ -14,13 +16,18 @@ ARGUMENT_LIST=(
     "pgcache"
     "objectcache"
     "edgeportCDN"
-    "wpmu"
+    "multisite"
     "REDIS_HOST"
-    "REDIS_PASS"
+    "REDIS_PORT"
+    "REDIS_USER"
+    "REDIS_PSWD"
     "CDN_URL"
     "CDN_ORI"
-    "MODE"
-    "DOMAIN"
+    "mode"
+    "url"
+    "domain"
+    "ENV_NAME"
+    "woocommerce"
 
 )
 
@@ -62,8 +69,18 @@ while [[ $# -gt 0 ]]; do
             shift 2
             ;;
 
-        --REDIS_PASS)
-            REDIS_PASS=$2
+        --REDIS_PORT)
+            REDIS_PORT=$2
+            shift 2
+            ;;
+
+        --REDIS_USER)
+            REDIS_USER=$2
+            shift 2
+            ;;
+            
+        --REDIS_PSWD)
+            REDIS_PSWD=$2
             shift 2
             ;;
 
@@ -77,20 +94,35 @@ while [[ $# -gt 0 ]]; do
             shift 2
             ;;
 
-        --wpmu)
-            wpmu=$2
+        --multisite)
+            multisite=$2
             shift 2
             ;;
 
-        --MODE)
-            MODE=$2
+        --mode)
+            mode=$2
             shift 2
             ;;
 
-        --DOMAIN)
-            DOMAIN=$2
+        --url)
+            url=$2
             shift 2
             ;;
+
+        --domain)
+            domain=$2
+            shift 2
+            ;;
+
+        --ENV_NAME)
+            ENV_NAME=$2
+            shift 2
+            ;;
+
+	--woocommerce)
+	    woocommerce=$2
+	    shift 2
+	    ;;
 
         *)
             break
@@ -107,25 +139,30 @@ COMPUTE_TYPE=$(grep "COMPUTE_TYPE=" /etc/jelastic/metainf.conf | cut -d"=" -f2)
 cd ${SERVER_WEBROOT};
 
 if [[ ${COMPUTE_TYPE} == *"llsmp"* || ${COMPUTE_TYPE} == *"litespeed"* ]] ; then
-	${WP} plugin install litespeed-cache --activate --path=${SERVER_WEBROOT}
-	CACHE_FLUSH="${WP} litespeed-purge all --path=${SERVER_WEBROOT}; rm -rf /var/www/webroot/.cache/vhosts/Jelastic/* "
-        WPCACHE='lscwp';
+    CACHE_FLUSH="${WP} litespeed-purge all --path=${SERVER_WEBROOT}; rm -rf /var/www/webroot/.cache/vhosts/Jelastic/* "
+    WPCACHE='lscwp';
 elif [[ ${COMPUTE_TYPE} == *"lemp"* || ${COMPUTE_TYPE} == *"nginx"* ]] ; then
-	${WP} plugin install w3-total-cache --activate --path=${SERVER_WEBROOT}
-	CACHE_FLUSH="${WP} w3-total-cache flush all --path=${SERVER_WEBROOT}; /var/www/webroot/.cache/* "
-        WPCACHE="w3tc";
+    CACHE_FLUSH="${WP} w3-total-cache flush all --path=${SERVER_WEBROOT}; /var/www/webroot/.cache/* "
+    WPCACHE="w3tc";
 else
-        echo 'Compute type is not defined';
-	exit;
+    echo 'Compute type is not defined';
+    exit;
 fi
+
+function generateCdnContent () {
+    echo "wp-content/themes/twentytwentytwo/style.css" > ~/checkCdnContent.txt;
+    echo "wp-includes/css/dist/block-library/style.min.css" >> ~/checkCdnContent.txt;
+    echo "wp-includes/css/dist/block-library/theme.min.css" >> ~/checkCdnContent.txt;
+    echo "wp-includes/js/wp-embed.min.js" >> ~/checkCdnContent.txt;
+}
 
 function checkCdnStatus () {
 if [ $WPCACHE == 'w3tc' ] ; then
-	CDN_ENABLE_CMD="${WP} w3-total-cache option set cdn.enabled true --type=boolean"
+    CDN_ENABLE_CMD="${WP} w3-total-cache option set cdn.enabled true --type=boolean"
 elif [ $WPCACHE == 'lscwp' ] ; then
-	CDN_ENABLE_CMD="${WP} litespeed-option set cdn true"
+    CDN_ENABLE_CMD="${WP} litespeed-option set cdn true"
 fi
-cat > ~/bin/checkCdnStatus.sh <<EOF
+cat > ~/checkCdnStatus.sh <<EOF
 #!/bin/bash
 while read -ru 4 CONTENT; do
   status=\$(curl \$1\$CONTENT -k -s -f -o /dev/null && echo "SUCCESS" || echo "ERROR")
@@ -135,38 +172,31 @@ while read -ru 4 CONTENT; do
     else
       exit
     fi
-done 4< ~/bin/checkCdnContent.txt
+done 4< ~/checkCdnContent.txt
 cd ${SERVER_WEBROOT}
 ${CDN_ENABLE_CMD} --path=${SERVER_WEBROOT} &>> /var/log/run.log
 ${CACHE_FLUSH}  &>> /var/log/run.log
 ${WP} cache flush --path=${SERVER_WEBROOT} &>> /var/log/run.log
 crontab -l | sed "/checkCdnStatus/d" | crontab -
 EOF
-chmod +x ~/bin/checkCdnStatus.sh
+chmod +x ~/checkCdnStatus.sh
 PROTOCOL=$(${WP} option get siteurl --path=${SERVER_WEBROOT} | cut -d':' -f1)
-crontab -l | { cat; echo "* * * * * /bin/bash ~/bin/checkCdnStatus.sh ${PROTOCOL}://${CDN_URL}/"; } | crontab
+crontab -l | { cat; echo "* * * * * /bin/bash ~/checkCdnStatus.sh ${PROTOCOL}://${CDN_URL}/"; } | crontab
 }
 
 if [ $purge == 'true' ] ; then
-	${CACHE_FLUSH} &>> /var/log/run.log
-	${WP} cache flush --path=${SERVER_WEBROOT} &>> /var/log/run.log
-	[ -d /tmp/lscache/vhosts/ ] && /usr/bin/rm -rf /tmp/lscache/vhosts/Jelastic/* &>> /var/log/run.log
+    ${CACHE_FLUSH} &>> /var/log/run.log
+    ${WP} cache flush --path=${SERVER_WEBROOT} &>> /var/log/run.log
+    [ -d /tmp/lscache/vhosts/ ] && /usr/bin/rm -rf /tmp/lscache/vhosts/Jelastic/* &>> /var/log/run.log
 fi
 
 if [ $pgcache == 'true' ] ; then
   case $WPCACHE in
     w3tc)
-	  $W3TC_OPTION_SET pgcache.enabled true --type=boolean --path=${SERVER_WEBROOT} &>> $lOG
+          $W3TC_OPTION_SET pgcache.enabled true --type=boolean --path=${SERVER_WEBROOT} &>> $lOG
           $W3TC_OPTION_SET pgcache.file.nfs true --type=boolean --path=${SERVER_WEBROOT} &>> $lOG
           ;;
     lscwp)
-          $LSCWP_OPTION_SET cache_browser true --path=${SERVER_WEBROOT} &>> $lOG
-          $LSCWP_OPTION_SET css_http2 true --path=${SERVER_WEBROOT} &>> $lOG
-          $LSCWP_OPTION_SET js_http2 true --path=${SERVER_WEBROOT} &>> $lOG
-          $LSCWP_OPTION_SET optm_qs_rm true --path=${SERVER_WEBROOT} &>> $lOG
-          $LSCWP_OPTION_SET optm_emoji_rm true --path=${SERVER_WEBROOT} &>> $lOG
-          $LSCWP_OPTION_SET esi_enabled true --path=${SERVER_WEBROOT} &>> $lOG
-	  $LSCWP_OPTION_SET cache_priv false --path=${SERVER_WEBROOT} &>> $lOG
           ;;
   esac
 fi
@@ -176,65 +206,109 @@ if [ $objectcache == 'true' ] ; then
     w3tc)
           $W3TC_OPTION_SET objectcache.enabled true --type=boolean --path=${SERVER_WEBROOT} &>> /var/log/run.log
           $W3TC_OPTION_SET objectcache.engine redis --path=${SERVER_WEBROOT} &>> /var/log/run.log
-          $W3TC_OPTION_SET objectcache.redis.servers ${REDIS_HOST}:6379 --path=${SERVER_WEBROOT} &>> /var/log/run.log
-          $W3TC_OPTION_SET objectcache.redis.password ${REDIS_PASS} --path=${SERVER_WEBROOT} &>> /var/log/run.log
+          $W3TC_OPTION_SET objectcache.redis.servers ${REDIS_HOST}:${REDIS_PORT} --path=${SERVER_WEBROOT} &>> /var/log/run.log
+          $W3TC_OPTION_SET objectcache.redis.password ${REDIS_PSWD} --path=${SERVER_WEBROOT} &>> /var/log/run.log
           ;;
     lscwp)
-          $LSCWP_OPTION_SET object true --path=${SERVER_WEBROOT} &>> /var/log/run.log
-          $LSCWP_OPTION_SET object-kind 1 --path=${SERVER_WEBROOT} &>> /var/log/run.log
-          $LSCWP_OPTION_SET object-host ${REDIS_HOST} --path=${SERVER_WEBROOT} &>> /var/log/run.log
-          $LSCWP_OPTION_SET object-port 6379 --path=${SERVER_WEBROOT} &>> /var/log/run.log
+          $LSCWP_OPTION_SET object true --path=${SERVER_WEBROOT} &>> /var/log/run.log;
+          $LSCWP_OPTION_SET object-kind 1 --path=${SERVER_WEBROOT} &>> /var/log/run.log;
+          
+          $LSCWP_OPTION_SET object-host '' --path=${SERVER_WEBROOT} &>> /var/log/run.log;
+          [[ ! -z "${REDIS_HOST}" ]] && $LSCWP_OPTION_SET object-host ${REDIS_HOST} --path=${SERVER_WEBROOT} &>> /var/log/run.log;
+          
+          $LSCWP_OPTION_SET object-port '' --path=${SERVER_WEBROOT} &>> /var/log/run.log;
+          [[ ! -z "${REDIS_PORT}" ]] && $LSCWP_OPTION_SET object-port ${REDIS_PORT} --path=${SERVER_WEBROOT} &>> /var/log/run.log;
+          
+          $LSCWP_OPTION_SET object-user '' --path=${SERVER_WEBROOT} &>> /var/log/run.log;
+          [[ ! -z "${REDIS_USER}" ]] && $LSCWP_OPTION_SET object-user ${REDIS_USER} --path=${SERVER_WEBROOT} &>> /var/log/run.log;
+          
+          $LSCWP_OPTION_SET object-pswd '' --path=${SERVER_WEBROOT} &>> /var/log/run.log;
+          [[ ! -z "${REDIS_PSWD}" ]] && $LSCWP_OPTION_SET object-pswd ${REDIS_PSWD} --path=${SERVER_WEBROOT} &>> /var/log/run.log;
           ;;
   esac
 fi
 
 if [ $edgeportCDN == 'true' ] ; then
-  if ! $(${WP} core is-installed --network --path=${SERVER_WEBROOT}); then 
+  if ! $(${WP} core is-installed --network --path=${SERVER_WEBROOT}); then
     case $WPCACHE in
       w3tc)
+          generateCdnContent;
           checkCdnStatus;
           $W3TC_OPTION_SET cdn.enabled false --type=boolean --path=${SERVER_WEBROOT} &>> /var/log/run.log
           $W3TC_OPTION_SET cdn.engine mirror --path=${SERVER_WEBROOT} &>> /var/log/run.log
           $W3TC_OPTION_SET cdn.mirror.domain ${CDN_URL} --path=${SERVER_WEBROOT} &>> /var/log/run.log
           ;;
       lscwp)
-        checkCdnStatus;
-        CDN_ORI=$(${WP} option get siteurl --path=${SERVER_WEBROOT} | cut -d'/' -f3)
-        PROTOCOL=$(${WP} option get siteurl --path=${SERVER_WEBROOT} | cut -d':' -f1)
-        $LSCWP_OPTION_SET cdn false --path=${SERVER_WEBROOT} &>> /var/log/run.log
-        $LSCWP_OPTION_SET cdn-mapping[url][0] ${PROTOCOL}://${CDN_URL}/ --path=${SERVER_WEBROOT} &>> /var/log/run.log
-        $LSCWP_OPTION_SET cdn-ori "//${CDN_ORI}/" --path=${SERVER_WEBROOT} &>> /var/log/run.log
+          generateCdnContent;
+          checkCdnStatus;
+          CDN_ORI=$(${WP} option get siteurl --path=${SERVER_WEBROOT} | cut -d'/' -f3)
+          PROTOCOL=$(${WP} option get siteurl --path=${SERVER_WEBROOT} | cut -d':' -f1)
+          $LSCWP_OPTION_SET cdn false --path=${SERVER_WEBROOT} &>> /var/log/run.log
+          $LSCWP_OPTION_SET cdn-mapping[url][0] ${PROTOCOL}://${CDN_URL}/ --path=${SERVER_WEBROOT} &>> /var/log/run.log
+          $LSCWP_OPTION_SET cdn-ori "//${CDN_ORI}/" --path=${SERVER_WEBROOT} &>> /var/log/run.log
           ;;
     esac
   fi
 fi
 
-if [ $wpmu == 'true' ] ; then
+if [ $multisite == 'true' ] ; then
+  cd ~/bin/ && ${WP} option update permalink_structure '' --path=/var/www/webroot/ROOT/ &>> /var/log/run.log;
+  cd ~/bin/ && ${WP} rewrite structure '' --hard --path=/var/www/webroot/ROOT/ &>> /var/log/run.log;
+  ${WP} cache flush --path=${SERVER_WEBROOT};
   case $WPCACHE in
     w3tc)
-          ${WP} plugin deactivate w3-total-cache --path=${SERVER_WEBROOT} &>> /var/log/run.log
-	  [[ ${MODE} == 'subdir' ]] && ${WP} core multisite-convert --path=${SERVER_WEBROOT} &>> /var/log/run.log
-	  [[ ${MODE} == 'subdom' ]] && ${WP} core multisite-convert --path=${SERVER_WEBROOT} --subdomains &>> /var/log/run.log
-	  ${WP} plugin activate w3-total-cache --path=${SERVER_WEBROOT} &>> /var/log/run.log
+          ${WP} plugin deactivate w3-total-cache --path=${SERVER_WEBROOT} &>> /var/log/run.log;
+          [[ ${mode} == 'subdir' ]] && ${WP} core multisite-convert --path=${SERVER_WEBROOT} &>> /var/log/run.log;
+          [[ ${mode} == 'subdom' ]] && ${WP} core multisite-convert --path=${SERVER_WEBROOT} --subdomains &>> /var/log/run.log;
+          ${WP} plugin activate w3-total-cache --path=${SERVER_WEBROOT} &>> /var/log/run.log;
           ;;
     lscwp)
-          ${WP} plugin deactivate litespeed-cache --path=${SERVER_WEBROOT} &>> /var/log/run.log
-          [[ ${MODE} == 'subdir' ]] && ${WP} core multisite-convert --path=${SERVER_WEBROOT} &>> /var/log/run.log
-          [[ ${MODE} == 'subdom' ]] && ${WP} core multisite-convert --path=${SERVER_WEBROOT} --subdomains &>> /var/log/run.log
-          ${WP} plugin activate litespeed-cache --path=${SERVER_WEBROOT} &>> /var/log/run.log
+          ${WP} plugin deactivate litespeed-cache --path=${SERVER_WEBROOT} &>> /var/log/run.log;
+          [[ ${mode} == 'subdir' ]] && ${WP} core multisite-convert --path=${SERVER_WEBROOT} &>> /var/log/run.log;
+          [[ ${mode} == 'subdom' ]] && ${WP} core multisite-convert --path=${SERVER_WEBROOT} --subdomains &>> /var/log/run.log;
+          ${WP} plugin activate litespeed-cache --network --path=${SERVER_WEBROOT} &>> /var/log/run.log;
+	  ${WP} cache flush --path=${SERVER_WEBROOT};
+	  echo "Configuring litespeed.conf.cache" >> /var/log/run.log;
+          ${WP} db query "UPDATE wp_sitemeta set meta_value = 1 where meta_key = 'litespeed.conf.cache'" --path=${SERVER_WEBROOT} &>> /var/log/run.log;
+	  ${WP} db query "select meta_value from wp_sitemeta where meta_key = 'litespeed.conf.cache'" --path=${SERVER_WEBROOT} &>> /var/log/run.log;
+
+	  echo "Configuring litespeed.conf.object" >> /var/log/run.log;
+          ${WP} db query "UPDATE wp_sitemeta set meta_value = 1 where meta_key = 'litespeed.conf.object'" --path=${SERVER_WEBROOT} &>> /var/log/run.log;
+	  echo "Configuring litespeed.conf.object-kind" >> /var/log/run.log;
+          ${WP} db query "UPDATE wp_sitemeta set meta_value = 1 where meta_key = 'litespeed.conf.object-kind'" --path=${SERVER_WEBROOT} &>> /var/log/run.log;
+
+	  echo "Configuring litespeed.conf.object-host" >> /var/log/run.log;
+          ${WP} db query "UPDATE wp_sitemeta set meta_value = '/var/run/redis/redis.sock' where meta_key = 'litespeed.conf.object-host'" --path=${SERVER_WEBROOT} &>> /var/log/run.log;
+
+	  echo "Configuring litespeed.conf.object-port" >> /var/log/run.log;
+	  ${WP} db query "UPDATE wp_sitemeta set meta_value = 0 where meta_key = 'litespeed.conf.object-port'" --path=${SERVER_WEBROOT} &>> /var/log/run.log;
           ;;
   esac
+  ${WP} cache flush --path=${SERVER_WEBROOT};
 fi
 
-if [ $DOMAIN != 'false' ] ; then
-  if ! $(${WP} core is-installed --network --path=${SERVER_WEBROOT}); then 
-	OLD_DOMAIN=$(${WP} option get siteurl --path=${SERVER_WEBROOT})
-	OLD_SHORT_DOMAIN=$(${WP} option get siteurl --path=${SERVER_WEBROOT} | cut -d'/' -f3)
-	NEW_SHORT_DOMAIN=$(echo $DOMAIN | cut -d'/' -f3)
-
-	${WP} search-replace "${OLD_DOMAIN}" "${DOMAIN}" --skip-columns=guid --all-tables --path=${SERVER_WEBROOT} &>> /var/log/run.log
-	${WP} search-replace "${OLD_SHORT_DOMAIN}" "${NEW_SHORT_DOMAIN}" --skip-columns=guid --all-tables --path=${SERVER_WEBROOT} &>> /var/log/run.log
-	${CACHE_FLUSH}  &>> /var/log/run.log
-	${WP} cache flush --path=${SERVER_WEBROOT} &>> /var/log/run.log
+if [ $url != 'false' ] ; then
+  if ! $(${WP} core is-installed --network --path=${SERVER_WEBROOT}); then
+    old_url=$(${WP} option get siteurl --path=${SERVER_WEBROOT})
+    old_domain=$(${WP} option get siteurl --path=${SERVER_WEBROOT} | cut -d'/' -f3)
+    new_domain=$(echo $url | cut -d'/' -f3)
+    ${WP} search-replace "${old_url}" "${url}" --skip-columns=guid --all-tables --path=${SERVER_WEBROOT} &>> /var/log/run.log
+    ${WP} search-replace "${old_domain}" "${new_domain}" --skip-columns=guid --all-tables --path=${SERVER_WEBROOT} &>> /var/log/run.log
+    ${CACHE_FLUSH}  &>> /var/log/run.log
+    ${WP} cache flush --path=${SERVER_WEBROOT} &>> /var/log/run.log
   fi
+fi
+
+if [ $domain != 'false' ] ; then
+    old_domain=$(${WP} option get siteurl --path=${SERVER_WEBROOT} | cut -d'/' -f3)
+    ${WP} search-replace "${old_domain}" "${domain}" --skip-columns=guid --all-tables --path=${SERVER_WEBROOT} &>> /var/log/run.log
+    ${CACHE_FLUSH}  &>> /var/log/run.log
+    ${WP} cache flush --path=${SERVER_WEBROOT} &>> /var/log/run.log
+  if $(${WP} core is-installed --network --path=${SERVER_WEBROOT}); then
+    ${WP} config set DOMAIN_CURRENT_SITE ${domain} --path=${SERVER_WEBROOT}
+  fi
+fi
+
+if [ $woocommerce == 'true' ] ; then
+  ${WP} plugin install woocommerce --activate --path=${SERVER_WEBROOT} &>> /var/log/run.log
 fi

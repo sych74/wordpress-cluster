@@ -31,6 +31,7 @@ stack:
       - galera: false
   - nodeType: storage
     tagSetting: storage_tag
+    nodeGroup: storage
     options:
       - glusterfs: false      
       - glusterfs: true
