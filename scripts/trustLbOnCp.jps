@@ -68,6 +68,5 @@ actions:
         if [ -x /usr/local/lsws/bin/lswsctrl ]; then
           /usr/local/lsws/bin/lswsctrl restart >> /var/log/run.log 2>&1
         else
-          jem service restart >> /var/log/run.log 2>&1
+          sudo jem service restart >> /var/log/run.log 2>&1
         fi
-      user: root
