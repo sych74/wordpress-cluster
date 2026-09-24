@@ -25,14 +25,13 @@ actions:
 
   applyAllowList:
     - cmd[cp]: |-
-        CONF="${HTTPD_CONFIG:-/var/www/conf/httpd_config.xml}"
-        LOG="${TRUST_LB_LOG:-/var/log/run.log}"
-        XMLSTARLET="${XMLSTARLET:-/usr/bin/xmlstarlet}"
+        CONF=/var/www/conf/httpd_config.xml
+        LOG=/var/log/run.log
         BLOCK="${response.block}"
 
         log() { echo "$(date -u +%Y-%m-%dT%H:%M:%SZ) trustLbOnCp: $*" >> "$LOG" 2>/dev/null || true; }
 
-        [ -x "$XMLSTARLET" ] || XMLSTARLET=$(command -v xmlstarlet || true)
+        XMLSTARLET=$(command -v xmlstarlet 2>/dev/null || echo /usr/bin/xmlstarlet)
         [ -x "$XMLSTARLET" ] || { log "xmlstarlet not found"; exit 1; }
         [ -r "$CONF" ] || { log "missing $CONF"; exit 1; }
 
